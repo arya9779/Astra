@@ -1,0 +1,40 @@
+name: Deploy to Production
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy-backend:
+    name: Deploy Backend
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Deploy to Render
+        run: |
+          echo "Backend deployment to Render/Fly.io"
+          echo "Configure deployment webhook or CLI here"
+        # Add actual deployment steps based on chosen platform
+        # For Render: Use webhook trigger
+        # For Fly.io: Use flyctl deploy
+
+  deploy-frontend:
+    name: Deploy Frontend
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Deploy to Vercel/Render
+        run: |
+          echo "Frontend deployment to Vercel/Render"
+          echo "Configure deployment webhook or CLI here"
+        # Add actual deployment steps based on chosen platform
+        # For Vercel: Use vercel CLI
+        # For Render: Use webhook trigger

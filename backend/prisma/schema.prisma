@@ -1,0 +1,305 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String   @id @default(uuid())
+  email         String   @unique
+  username      String   @unique
+  passwordHash  String   @map("password_hash")
+  walletAddress String?  @unique @map("wallet_address")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  profile              UserProfile?
+  posts                Post[]
+  validations          Validation[]
+  karmaTransactions    KarmaTransaction[]
+  followersRelation    Follow[]               @relation("UserFollowers")
+  followingRelation    Follow[]               @relation("UserFollowing")
+  boardMemberships     BoardMember[]
+  redemptions          Redemption[]
+  campaignParticipations CampaignParticipation[]
+  votes                Vote[]
+  proposalsCreated     Proposal[]
+  postEngagements      PostEngagement[]
+  userAstras           UserAstra[]
+  moderationReviews    ModerationQueue[]
+
+  @@map("users")
+}
+
+model UserProfile {
+  id         String   @id @default(uuid())
+  userId     String   @unique @map("user_id")
+  karma      Int      @default(0)
+  league     String   @default("CHANDRIKA")
+  role       String   @default("CITIZEN")
+  avatarUrl  String?  @map("avatar_url")
+  bio        String?
+  visibility String   @default("PUBLIC")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_profiles")
+}
+
+model UserAstra {
+  userId      String   @map("user_id")
+  astraType   String   @map("astra_type")
+  unlockedAt  DateTime @default(now()) @map("unlocked_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([userId, astraType])
+  @@map("user_astras")
+}
+
+model KarmaTransaction {
+  id              String   @id @default(uuid())
+  userId          String   @map("user_id")
+  amount          Int
+  type            String
+  reason          String
+  balanceAfter    Int      @map("balance_after")
+  metadata        Json?
+  blockchainTxHash String? @map("blockchain_tx_hash")
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt(sort: Desc)])
+  @@index([blockchainTxHash])
+  @@map("karma_transactions")
+}
+
+model Post {
+  id               String   @id @default(uuid())
+  authorId         String   @map("author_id")
+  content          String
+  mediaUrls        String[] @map("media_urls")
+  mediaType        String?  @map("media_type")
+  ipfsHash         String?  @map("ipfs_hash")
+  validationStatus String   @default("PENDING") @map("validation_status")
+  validationCount  Int      @default(0) @map("validation_count")
+  aiModerationResult Json?  @map("ai_moderation_result")
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  author      User             @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  validations Validation[]
+  engagements PostEngagement[]
+  moderationQueue ModerationQueue[]
+
+  @@index([authorId, createdAt(sort: Desc)])
+  @@index([validationStatus])
+  @@map("posts")
+}
+
+model PostEngagement {
+  id        String   @id @default(uuid())
+  postId    String   @map("post_id")
+  userId    String   @map("user_id")
+  type      String
+  createdAt DateTime @default(now()) @map("created_at")
+
+  post Post @relation(fields: [postId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([postId, userId, type])
+  @@index([postId])
+  @@map("post_engagements")
+}
+
+model Validation {
+  id              String   @id @default(uuid())
+  postId          String   @map("post_id")
+  validatorId     String   @map("validator_id")
+  verdict         String
+  confidence      Float
+  notes           String?
+  blockchainTxHash String? @map("blockchain_tx_hash")
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  post      Post @relation(fields: [postId], references: [id], onDelete: Cascade)
+  validator User @relation(fields: [validatorId], references: [id], onDelete: Cascade)
+
+  @@unique([postId, validatorId])
+  @@index([postId])
+  @@index([validatorId])
+  @@map("validations")
+}
+
+model Follow {
+  followerId String   @map("follower_id")
+  followeeId String   @map("followee_id")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  follower User @relation("UserFollowers", fields: [followerId], references: [id], onDelete: Cascade)
+  followee User @relation("UserFollowing", fields: [followeeId], references: [id], onDelete: Cascade)
+
+  @@id([followerId, followeeId])
+  @@map("follows")
+}
+
+model Board {
+  id          String   @id @default(uuid())
+  name        String
+  description String?
+  ownerId     String   @map("owner_id")
+  type        String
+  isEncrypted Boolean  @default(false) @map("is_encrypted")
+  matrixRoomId String? @map("matrix_room_id")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  members        BoardMember[]
+  anonymousPosts AnonymousPost[]
+
+  @@map("boards")
+}
+
+model BoardMember {
+  boardId  String   @map("board_id")
+  userId   String   @map("user_id")
+  role     String   @default("MEMBER")
+  joinedAt DateTime @default(now()) @map("joined_at")
+
+  board Board @relation(fields: [boardId], references: [id], onDelete: Cascade)
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([boardId, userId])
+  @@map("board_members")
+}
+
+model Reward {
+  id          String   @id @default(uuid())
+  name        String
+  description String?
+  karmaCost   Int      @map("karma_cost")
+  type        String
+  stock       Int      @default(0)
+  imageUrl    String?  @map("image_url")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  redemptions Redemption[]
+
+  @@map("rewards")
+}
+
+model Redemption {
+  id              String   @id @default(uuid())
+  userId          String   @map("user_id")
+  rewardId        String   @map("reward_id")
+  karmaSpent      Int      @map("karma_spent")
+  status          String   @default("PENDING")
+  blockchainTxHash String? @map("blockchain_tx_hash")
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  reward Reward @relation(fields: [rewardId], references: [id])
+
+  @@map("redemptions")
+}
+
+model Campaign {
+  id                  String   @id @default(uuid())
+  brandId             String   @map("brand_id")
+  name                String
+  description         String?
+  karmaReward         Int      @map("karma_reward")
+  smartContractAddress String? @map("smart_contract_address")
+  startDate           DateTime @map("start_date")
+  endDate             DateTime @map("end_date")
+  createdAt           DateTime @default(now()) @map("created_at")
+
+  participations CampaignParticipation[]
+
+  @@map("campaigns")
+}
+
+model CampaignParticipation {
+  campaignId     String   @map("campaign_id")
+  userId         String   @map("user_id")
+  karmaEarned    Int?     @map("karma_earned")
+  participatedAt DateTime @default(now()) @map("participated_at")
+
+  campaign Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([campaignId, userId])
+  @@map("campaign_participations")
+}
+
+model Proposal {
+  id            String   @id @default(uuid())
+  proposerId    String   @map("proposer_id")
+  title         String
+  description   String
+  type          String
+  status        String   @default("ACTIVE")
+  votingEndsAt  DateTime @map("voting_ends_at")
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  proposer User   @relation(fields: [proposerId], references: [id], onDelete: Cascade)
+  votes    Vote[]
+
+  @@index([status, votingEndsAt])
+  @@map("proposals")
+}
+
+model Vote {
+  id         String   @id @default(uuid())
+  proposalId String   @map("proposal_id")
+  voterId    String   @map("voter_id")
+  voteType   String   @map("vote_type")
+  karmaWeight Int     @map("karma_weight")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  proposal Proposal @relation(fields: [proposalId], references: [id], onDelete: Cascade)
+  voter    User     @relation(fields: [voterId], references: [id], onDelete: Cascade)
+
+  @@unique([proposalId, voterId])
+  @@map("votes")
+}
+
+model ModerationQueue {
+  id          String   @id @default(uuid())
+  postId      String   @map("post_id")
+  reason      String
+  aiFlags     String[] @map("ai_flags")
+  confidence  Float
+  status      String   @default("PENDING") // PENDING, APPROVED, REJECTED
+  reviewedBy  String?  @map("reviewed_by")
+  reviewedAt  DateTime? @map("reviewed_at")
+  reviewNotes String?  @map("review_notes")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  post     Post  @relation(fields: [postId], references: [id], onDelete: Cascade)
+  reviewer User? @relation(fields: [reviewedBy], references: [id])
+
+  @@index([status, createdAt])
+  @@map("moderation_queue")
+}
+
+model AnonymousPost {
+  id            String   @id @default(uuid())
+  boardId       String   @map("board_id")
+  content       String
+  nullifierHash String   @unique @map("nullifier_hash")
+  zkProof       Json     @map("zk_proof")
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  board Board @relation(fields: [boardId], references: [id], onDelete: Cascade)
+
+  @@index([boardId, createdAt(sort: Desc)])
+  @@map("anonymous_posts")
+}
